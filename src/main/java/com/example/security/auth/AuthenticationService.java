@@ -1,6 +1,9 @@
 package com.example.security.auth;
 
 import com.example.security.config.JwtService;
+import com.example.security.token.Token;
+import com.example.security.token.TokenRepository;
+import com.example.security.token.TokenType;
 import com.example.security.user.Role;
 import com.example.security.user.User;
 import com.example.security.user.UserRepository;
@@ -15,6 +18,7 @@ import org.springframework.stereotype.Service;
 public class AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
+    private final TokenRepository tokenRepository;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
 
@@ -27,8 +31,9 @@ public class AuthenticationService {
                 .password(passwordEncoder.encode(authenticationRequest.getPassword()))
                 .role(Role.USER)
                 .build();
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
         String token = jwtService.generateToken(user);
+        saveUserToken(token, savedUser);
         return AuthenticationResponse
                 .builder()
                 .token(token)
@@ -39,9 +44,21 @@ public class AuthenticationService {
         authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(authenticationRequest.getEmail(), authenticationRequest.getPassword()));
         User user = userRepository.findByEmail(authenticationRequest.getEmail()).orElseThrow();
         String token = jwtService.generateToken(user);
+        saveUserToken(token, user);
         return AuthenticationResponse
                 .builder()
                 .token(token)
                 .build();
+    }
+
+    private void saveUserToken(String jwtToken, User user) {
+        Token savedToken = Token.builder()
+                .token(jwtToken)
+                .user(user)
+                .tokenType(TokenType.BEARER)
+                .expired(false)
+                .revoked(false)
+                .build();
+        tokenRepository.save(savedToken);
     }
 }
