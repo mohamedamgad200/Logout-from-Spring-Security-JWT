@@ -13,6 +13,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class AuthenticationService {
@@ -44,6 +46,7 @@ public class AuthenticationService {
         authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(authenticationRequest.getEmail(), authenticationRequest.getPassword()));
         User user = userRepository.findByEmail(authenticationRequest.getEmail()).orElseThrow();
         String token = jwtService.generateToken(user);
+        revokeAllUserTokens(user);
         saveUserToken(token, user);
         return AuthenticationResponse
                 .builder()
@@ -60,5 +63,14 @@ public class AuthenticationService {
                 .revoked(false)
                 .build();
         tokenRepository.save(savedToken);
+    }
+
+    private void revokeAllUserTokens(User user) {
+        List<Token> validUserTokens = tokenRepository.findAllValidTokensByUserId(user.getId());
+        validUserTokens.forEach(token -> {
+            token.setRevoked(true);
+            token.setExpired(true);
+        });
+        tokenRepository.saveAll(validUserTokens);
     }
 }
